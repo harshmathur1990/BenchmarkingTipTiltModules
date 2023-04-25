@@ -5,7 +5,7 @@
 #include <chrono>
 #include <fftw3.h>
 #include <benchmark/benchmark.h>
-#define NN 768
+#define NN 256
 #define NPIXFFT NN * (1 + (NN / 2))
 using namespace std;
 
@@ -58,8 +58,8 @@ static void BM_IntelFFT(benchmark::State& state) {
 
     double *image = (double*)malloc(sizeof(double) * NN * NN);
     double *recoveredImage = (double*)malloc(sizeof(double) * NN * NN);
-    mkl_double_complex *imageFT = (mkl_double_complex*) mkl_malloc(
-            NPIXFFT * sizeof(mkl_double_complex),64);
+    fftw_complex *imageFT = (fftw_complex*) mkl_malloc(
+            NPIXFFT * sizeof(fftw_complex),64);
 
     for (unsigned int i=0; i<NN * NN; i++){
         image[i] = i * i + i * 2 + 1;
