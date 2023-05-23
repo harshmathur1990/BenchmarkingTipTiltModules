@@ -17,7 +17,7 @@ typedef struct {
 fftw_plan PlanForward;
 fftw_plan PlanInverse;
 
-int getIntelFFTWPlans(DFTI_DESCRIPTOR_HANDLE *descHandle);
+int getIntelFFTWPlans(DFTI_DESCRIPTOR_HANDLE *descHandle, int type);
 
 static void BM_FFTW(benchmark::State& state) {
     double *forIN;
@@ -51,35 +51,36 @@ static void BM_FFTW(benchmark::State& state) {
     }
 }
 
-static void BM_IntelFFT(benchmark::State& state) {
-
-    DFTI_DESCRIPTOR_HANDLE descHandle;
-    getIntelFFTWPlans(&descHandle);
-
-    double *image = (double*)malloc(sizeof(double) * NN * NN);
-    double *recoveredImage = (double*)malloc(sizeof(double) * NN * NN);
-    fftw_complex *imageFT = (fftw_complex*) mkl_malloc(
-            NPIXFFT * sizeof(fftw_complex),64);
-
-    for (unsigned int i=0; i<NN * NN; i++){
-        image[i] = i * i + i * 2 + 1;
-    }
-
-    for (auto _ : state) {
-        // This code gets timed
-        DftiComputeForward(descHandle, image, imageFT);
-        DftiComputeBackward(descHandle, imageFT, recoveredImage);
-        benchmark::DoNotOptimize(recoveredImage);
-        benchmark::ClobberMemory();
-    }
-}
+//static void BM_IntelFFT(benchmark::State& state) {
+//
+//    DFTI_DESCRIPTOR_HANDLE descHandleForward, descHandleBackward;
+//    getIntelFFTWPlans(&descHandleForward, 0);
+//    getIntelFFTWPlans(&descHandleBackward, 1);
+//
+//    double *image = (double*)malloc(sizeof(double) * NN * NN);
+//    double *recoveredImage = (double*)malloc(sizeof(double) * NN * NN);
+//    fftw_complex *imageFT = (fftw_complex*) mkl_malloc(
+//            NPIXFFT * sizeof(fftw_complex),64);
+//
+//    for (unsigned int i=0; i<NN * NN; i++){
+//        image[i] = i * i + i * 2 + 1;
+//    }
+//
+//    for (auto _ : state) {
+//        // This code gets timed
+//        DftiComputeForward(descHandleForward, image, imageFT);
+//        DftiComputeBackward(descHandleBackward, imageFT, recoveredImage);
+//        benchmark::DoNotOptimize(recoveredImage);
+//        benchmark::ClobberMemory();
+//    }
+//}
 // Register the function as a benchmark
-BENCHMARK(BM_IntelFFT);
+//BENCHMARK(BM_IntelFFT);
 BENCHMARK(BM_FFTW);
 // Run the benchmark
 BENCHMARK_MAIN();
 
-int getIntelFFTWPlans(DFTI_DESCRIPTOR_HANDLE *descHandle){
+int getIntelFFTWPlans(DFTI_DESCRIPTOR_HANDLE *descHandle, int type){
 
     MKL_LONG lengths[2];
     lengths[0] = NN;
@@ -114,18 +115,34 @@ int getIntelFFTWPlans(DFTI_DESCRIPTOR_HANDLE *descHandle){
         return -5;
     }
 
-    MKL_LONG strides[3];
-    strides[0] = 0;
-    strides[1] = 1;
-    strides[2] = NN;
+    MKL_LONG inputStrides[3], outputStrides[3];
 
-    status = DftiSetValue(*descHandle, DFTI_INPUT_STRIDES, strides);
+    if (type == 0) {
+        inputStrides[0] = 0;
+        inputStrides[1] = 1;
+        inputStrides[2] = NN;
+
+        outputStrides[0] = 0;
+        outputStrides[1] = 1;
+        outputStrides[2] = 1 + (NN / 2);
+    }
+    else {
+        inputStrides[0] = 0;
+        inputStrides[1] = 1;
+        inputStrides[2] = 1 + (NN / 2);
+
+        outputStrides[0] = 0;
+        outputStrides[1] = 1;
+        outputStrides[2] = NN;
+    }
+
+    status = DftiSetValue(*descHandle, DFTI_INPUT_STRIDES, inputStrides);
     if (status != 0) {
         cout << "DftiSetValue DFTI_INPUT_STRIDES failed : " << status << endl;
         return -6;
     }
 
-    status = DftiSetValue(*descHandle, DFTI_OUTPUT_STRIDES, strides);
+    status = DftiSetValue(*descHandle, DFTI_OUTPUT_STRIDES, outputStrides);
     if (status != 0) {
         cout << "DftiSetValue DFTI_OUTPUT_STRIDES failed : " << status << endl;
         return -7;
